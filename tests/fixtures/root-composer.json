@@ -1,0 +1,14 @@
+{
+    "name": "test/magento-project",
+    "require": {
+        "magento/module-fake": "^1.0"
+    },
+    "repositories": [
+        { "type": "path", "url": "./local-packages/magento/module-fake", "options": { "symlink": false } }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": false
+    }
+}

@@ -4,7 +4,7 @@ Runs [ampersand-magento2-upgrade-patch-helper](https://github.com/AmpersandHQ/am
 against a locally mounted Magento 2 project. Non-destructive: your project is
 mounted read-only and all work happens inside the container.
 
-## Workflow
+## How it works
 
 1. Resolve your upgrade locally — run `composer update`, fix conflicts, verify
    `composer install` succeeds and your `vendor/` is up to date.
@@ -18,18 +18,25 @@ two git states and a diff.
 
 ---
 
-## Quick start
+## Pre-built images
 
-### 1. Build
+Available on Docker Hub and GitHub Container Registry for PHP 8.1–8.5:
 
 ```bash
-docker build -t upgrade-patch-helper .
+# Docker Hub
+docker pull samjuk/magento2-upgrade-patch-helper:8.2
 
-# Different PHP version (e.g. Magento ≤ 2.4.4):
-docker build --build-arg PHP_VERSION=8.1 -t upgrade-patch-helper:8.1 .
+# GitHub Container Registry
+docker pull ghcr.io/samjuk1999/magento2-upgrade-tools/upgrade-patch-helper-docker:8.2
 ```
 
-### 2. Fetch the compare branch (on the host)
+Tags: `8.1` `8.2` `8.3` `8.4` `8.5` — and versioned tags like `8.2-v1.0.0` on releases.
+
+---
+
+## Quick start
+
+### 1. Fetch the compare branch (on the host)
 
 The ref you pass to `--branch` must exist in the local git history.
 
@@ -38,7 +45,7 @@ cd /path/to/your/magento
 git fetch origin
 ```
 
-### 3. Run
+### 2. Run
 
 ```bash
 docker run --rm \
@@ -46,7 +53,7 @@ docker run --rm \
   -v $(pwd)/upgrade-output:/output \
   -v ~/.composer/cache:/root/.composer/cache \
   -v ~/.composer/auth.json:/root/.composer/auth.json:ro \
-  upgrade-patch-helper \
+  samjuk/magento2-upgrade-patch-helper:8.2 \
   --branch origin/production
 ```
 
@@ -67,7 +74,7 @@ docker run --rm \
   -v $(pwd)/upgrade-output:/output \
   -v ~/.composer/cache:/root/.composer/cache \
   -v ~/.composer/auth.json:/root/.composer/auth.json:ro \
-  upgrade-patch-helper \
+  samjuk/magento2-upgrade-patch-helper:8.2 \
   --branch origin/production \
   --show-info \
   --sort-by-type
@@ -79,8 +86,7 @@ docker run --rm \
 
 Pass `--gui` to generate the additional artifacts needed by the
 [elgentos/magento2-upgrade-gui](https://github.com/elgentos/magento2-upgrade-gui)
-Electron desktop app. This copies vendor into the container (slower but
-necessary for classmap generation).
+Electron desktop app.
 
 ```bash
 docker run --rm \
@@ -88,7 +94,7 @@ docker run --rm \
   -v $(pwd)/upgrade-output:/output \
   -v ~/.composer/cache:/root/.composer/cache \
   -v ~/.composer/auth.json:/root/.composer/auth.json:ro \
-  upgrade-patch-helper \
+  samjuk/magento2-upgrade-patch-helper:8.2 \
   --branch origin/production \
   --gui
 ```
@@ -104,20 +110,6 @@ Then:
 1. Download the Electron app from the [releases page](https://github.com/elgentos/magento2-upgrade-gui/releases)
 2. Unpack vendor inside the output directory: `cd upgrade-output && tar xzf vendor.tar.gz`
 3. Open the app and point it to `upgrade-output/`
-
----
-
-## docker-compose
-
-```bash
-cp .env.example .env
-# Edit .env — set PROJECT_PATH and COMPARE_BRANCH at minimum
-
-docker compose run --rm patch-helper
-
-# With extra flags:
-docker compose run --rm patch-helper --show-info --sort-by-type --gui
-```
 
 ---
 
@@ -150,9 +142,48 @@ For private packages or `repo.magento.com`:
 
 ---
 
+## Development
+
+Requires Docker and `make`.
+
+```bash
+# Build image (default PHP 8.2)
+make build
+
+# Build for a specific PHP version
+make build PHP_VERSION=8.4
+
+# Build all PHP versions (8.1–8.5)
+make build-all
+
+# Run smoke test (verifies --help works)
+make test-smoke
+
+# Run E2E tests (requires composer on host for fixture creation)
+make test-e2e
+
+# Run both
+make test
+
+make help   # full target list
+```
+
+### How the tests work
+
+**Smoke test** (`tests/smoke.sh`) — runs `--help` and asserts exit 0.
+
+**E2E tests** (`tests/e2e.sh`) — build a minimal two-commit git repo on the
+host using a local composer path repository (`tests/fixtures/`), mount it as
+`/project`, and exercise the full container pipeline. No Magento credentials
+needed. The patch-helper analysis step is attempted but allowed to fail
+gracefully — the fixture is not a real Magento installation. What is verified:
+the vendor diff, all output files, the no-composer-lock warning path, and GUI
+artifact generation.
+
+---
+
 ## Non-destructive guarantee
 
 - `/project` is always mounted **read-only** — nothing in your project is ever touched.
 - All git, composer, and diff operations run on copies inside the container.
 - The container is ephemeral — `--rm` discards all working state on exit.
-- Symlinks are used for `vendor/` in non-GUI mode to avoid copying several GB.

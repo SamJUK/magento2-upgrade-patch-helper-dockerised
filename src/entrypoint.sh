@@ -140,11 +140,14 @@ echo "==> [4/5] Running patch-helper analysis..."
 [[ "$SORT_BY_TYPE" == "true" ]] && PH_ARGS="$PH_ARGS --sort-by-type"
 
 # shellcheck disable=SC2086
-php -d memory_limit="$MEMORY_LIMIT" \
+if ! php -d memory_limit="$MEMORY_LIMIT" \
   /patch-helper/bin/patch-helper.php analyse \
   $PH_ARGS \
   . \
-  | tee patch-helper-output.txt
+  | tee patch-helper-output.txt; then
+    echo "Warning: patch-helper analysis failed — output may be incomplete" >&2
+    echo "         Is /project a valid Magento 2 installation?" >&2
+fi
 
 # ── Step 5: GUI artifacts ─────────────────────────────────────────────────────
 if [[ "$GUI_MODE" == "true" ]]; then

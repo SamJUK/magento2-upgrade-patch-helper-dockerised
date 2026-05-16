@@ -1,0 +1,16 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  build-and-test:
+    uses: ./.github/workflows/_build-test.yml
+
+  publish:
+    needs: build-and-test
+    uses: ./.github/workflows/_publish.yml
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

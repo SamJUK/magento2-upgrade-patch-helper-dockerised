@@ -1,0 +1,48 @@
+name: Build and Test
+
+on:
+  workflow_call:
+
+jobs:
+  build-and-test:
+    name: PHP ${{ matrix.php_version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php_version: ['8.1', '8.2', '8.3', '8.4', '8.5']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up PHP + Composer (for E2E fixture creation)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php_version }}
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ matrix.php_version }}-${{ hashFiles('tests/fixtures/root-composer.json') }}
+          restore-keys: composer-${{ matrix.php_version }}-${{ hashFiles('tests/fixtures/root-composer.json') }}
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: src
+          load: true
+          build-args: PHP_VERSION=${{ matrix.php_version }}
+          tags: upgrade-patch-helper-test:${{ matrix.php_version }}
+          cache-from: type=gha,scope=php-${{ matrix.php_version }}
+          cache-to: type=gha,mode=max,scope=php-${{ matrix.php_version }}
+
+      - name: Smoke test
+        run: IMAGE_REF=upgrade-patch-helper-test:${{ matrix.php_version }} bash tests/smoke.sh
+
+      - name: E2E tests
+        run: IMAGE_REF=upgrade-patch-helper-test:${{ matrix.php_version }} bash tests/e2e.sh

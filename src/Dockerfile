@@ -1,15 +1,15 @@
 ARG PHP_VERSION=8.2
-FROM php:${PHP_VERSION}-cli
+FROM php:${PHP_VERSION}-cli-alpine
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
+        bash \
         git \
         unzip \
         libzip-dev \
-        libicu-dev \
+        icu-dev \
         libxml2-dev \
-        libonig-dev \
-    && docker-php-ext-install zip intl \
-    && rm -rf /var/lib/apt/lists/*
+        oniguruma-dev \
+    && docker-php-ext-install zip intl
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

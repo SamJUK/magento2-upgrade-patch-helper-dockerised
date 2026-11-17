@@ -1,7 +1,7 @@
 # Magento 2 Upgrade Patch Helper (Docker)
 
 Runs the Magento 2 upgrade patch helper against a Magento project mounted read-only, with nothing to install but Docker.
-It lists every preference, plugin, template, layout, DB schema and API customisation that touches a file changed by your upgrade.
+It reports the preferences, plugins, template and layout overrides, DB schema and API customisations that touch a file your upgrade changes.
 
 The image bundles [convenient/convenient-magento2-upgrade-patch-helper](https://github.com/convenient/convenient-magento2-upgrade-patch-helper), a fork by the original author of [idhlagency/ampersand-magento2-upgrade-patch-helper](https://github.com/idhlagency/ampersand-magento2-upgrade-patch-helper) (formerly AmpersandHQ).
 The fork adds Magento 2.4.9+ support and checks for system config, CSP, REST and GraphQL APIs and Hyvä CMS components.
@@ -36,7 +36,7 @@ Results land in `./upgrade-output/`:
 
 | File | What it is |
 |------|------------|
-| `patch-helper-output.txt` | The table of WARN and INFO items to review |
+| `patch-helper-output.txt` | The table of WARN items to review (INFO items too with `--show-info`) |
 | `vendor_files_to_check.patch` | The vendor changes behind each item |
 | `vendor.patch` | The full vendor diff |
 
@@ -45,7 +45,8 @@ The run warns if the project's `composer.lock` needs a different PHP version.
 
 ## Images
 
-Tags `8.1` to `8.5` for `linux/amd64` and `linux/arm64` (Apple Silicon runs natively), plus `<php>-<release>` on each release, for example `8.3-v1.2.0`.
+Tags `8.1` to `8.5` for `linux/amd64` and `linux/arm64` (Apple Silicon runs natively), plus `<php>-<release>` on each release, for example `8.3-1.2.0`.
+`latest` is PHP 8.4.
 
 ```bash
 docker pull samjuk/magento2-upgrade-patch-helper:8.3

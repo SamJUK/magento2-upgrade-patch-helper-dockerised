@@ -4,6 +4,9 @@ on:
   push:
     tags: ['v*.*.*']
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     uses: ./.github/workflows/_build-test.yml
@@ -14,8 +17,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
-      id-token: write
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

@@ -19,8 +19,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
-      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +61,9 @@ jobs:
           images: |
             ${{ env.DOCKERHUB_IMAGE }}
             ${{ env.GHCR_IMAGE }}
+          flavor: latest=false
           tags: |
+            type=raw,value=latest,enable=${{ matrix.php_version == '8.4' }}
             type=raw,value=${{ matrix.php_version }}
             type=semver,pattern=${{ matrix.php_version }}-{{version}}
 
@@ -80,5 +80,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=php-${{ matrix.php_version }}
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php_version }}

@@ -18,6 +18,9 @@ echo "==> GNU patch and diff (patch-helper needs patch -F, busybox lacks it)"
 echo "==> patch-helper loads"
 [[ "$(in_image php /patch-helper/bin/patch-helper.php list)" == *analyse* ]]
 
+echo "==> image is labelled with the patch-helper commit"
+[[ "$(docker inspect "$IMAGE_REF" --format '{{index .Config.Labels "io.github.patch-helper.ref"}}')" =~ ^[0-9a-f]{40}$ ]]
+
 echo "==> runs as an arbitrary uid"
 docker run --rm --user 4242:4242 "$IMAGE_REF" --help >/dev/null
 

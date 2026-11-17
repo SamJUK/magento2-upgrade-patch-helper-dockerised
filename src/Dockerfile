@@ -1,16 +1,19 @@
 ARG PHP_VERSION=8.2
 # Builds pass the pinned image from php/<minor>/Dockerfile, which Dependabot bumps
 ARG PHP_IMAGE=php:${PHP_VERSION}-cli-alpine
+# Fork with fixes and new checks not yet merged upstream (idhlagency/ampersand-magento2-upgrade-patch-helper).
+# Declared globally so the final stage can label the image with them.
+ARG PATCH_HELPER_REPO=https://github.com/convenient/convenient-magento2-upgrade-patch-helper.git
+ARG PATCH_HELPER_REF=26304333518b46e36577e920f7d7294098038ae9
 
-FROM composer:2.11.2 AS composer
+FROM composer:2.11.2@sha256:0c8e663f14c94d07b3c45b175c51f5a14718508f21fe4dd7e54f09488dd0ed71 AS composer
 
 FROM ${PHP_IMAGE} AS build
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 RUN apk add --no-cache git
 
-# Fork with fixes and new checks not yet merged upstream (idhlagency/ampersand-magento2-upgrade-patch-helper)
-ARG PATCH_HELPER_REPO=https://github.com/convenient/convenient-magento2-upgrade-patch-helper.git
-ARG PATCH_HELPER_REF=26304333518b46e36577e920f7d7294098038ae9
+ARG PATCH_HELPER_REPO
+ARG PATCH_HELPER_REF
 RUN git init -q /patch-helper \
     && git -C /patch-helper fetch -q --depth=1 "$PATCH_HELPER_REPO" "$PATCH_HELPER_REF" \
     && git -C /patch-helper checkout -q FETCH_HEAD \

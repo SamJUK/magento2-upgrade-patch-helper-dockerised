@@ -119,6 +119,18 @@ else
   check "vendor.patch written" [ -s "$out/vendor.patch" ]
 
   echo ""
+  echo "==> project files cannot stand in for results"
+  out="$(new_out)"
+  echo stale >"$out/classmap.json"
+  ln -s /proc/self/environ "$FIXTURE/vendor_orig.tar.gz"
+  run "$out" -e 'COMPOSER_AUTH={"http-basic":{"example.test":{"username":"CANARY-7f3a","password":"x"}}}' -- --branch HEAD~1
+  rm -f "$FIXTURE/vendor_orig.tar.gz"
+  check "exits 0" [ "$CODE" = 0 ]
+  check "override still flagged" has "$OVERRIDE" "$OUT"
+  ! grep -rqa CANARY-7f3a "$out"; check "credentials not copied into /output" [ $? = 0 ]
+  check "stale result from an earlier run removed" [ ! -e "$out/classmap.json" ]
+
+  echo ""
   echo "==> output ownership"
   owned="$TMP/owned"; mkdir "$owned"
   run "$owned" -- --branch HEAD~1

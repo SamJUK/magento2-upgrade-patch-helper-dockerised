@@ -9,6 +9,7 @@ OUTPUT_DIR="/output"
 PROJECT_DIR="/project"
 PH_ARGS=()
 ORIG_ARGS=("$@")
+RESULTS=(vendor.patch vendor_files_to_check.patch patch-helper-output.txt classmap.json vendor_orig.tar.gz)
 
 usage() {
   cat <<EOF
@@ -91,19 +92,25 @@ fi
 
 if [[ -f "$PROJECT_DIR/.git" ]]; then
   gitdir="$(sed -n 's/^gitdir: //p' "$PROJECT_DIR/.git")"
+  [[ "$gitdir" == /* ]] || gitdir="$PROJECT_DIR/$gitdir"
   [[ -d "$gitdir" ]] || die "$PROJECT_DIR is a git worktree whose git directory is not mounted.
        Also mount the main repository's .git at the same path, read-only:
        -v ${gitdir%/.git/worktrees/*}/.git:${gitdir%/.git/worktrees/*}/.git:ro"
 fi
 git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1 || die "$PROJECT_DIR is not a git repository"
-git -C "$PROJECT_DIR" rev-parse --verify --quiet "$COMPARE_BRANCH^{tree}" >/dev/null \
-  || die "'$COMPARE_BRANCH' not found in $PROJECT_DIR (run git fetch on the host if it is a remote branch)"
+if ! git -C "$PROJECT_DIR" rev-parse --verify --quiet "$COMPARE_BRANCH^{tree}" >/dev/null; then
+  [[ "$(git -C "$PROJECT_DIR" rev-parse --is-shallow-repository)" == true ]] \
+    && die "'$COMPARE_BRANCH' not found: $PROJECT_DIR is a shallow clone, run git fetch --unshallow (in CI, fetch-depth: 0)"
+  die "'$COMPARE_BRANCH' not found in $PROJECT_DIR (run git fetch on the host if it is a remote branch)"
+fi
 [[ -d "$PROJECT_DIR/vendor" ]] || die "$PROJECT_DIR/vendor not found, run composer install for the version you are upgrading to"
 
 mkdir -p "$OUTPUT_DIR" 2>/dev/null && [[ -w "$OUTPUT_DIR" ]] \
-  || die "cannot write to $OUTPUT_DIR (running as uid $(id -u))"
+  || die "cannot write to $OUTPUT_DIR (running as uid $(id -u); is it mounted read-only or owned by another user?)"
 mountpoint -q "$OUTPUT_DIR" \
   || echo "Warning: $OUTPUT_DIR is not a mounted volume, results will be lost when the container exits" >&2
+# Results from an earlier run would otherwise look like this run's
+for f in "${RESULTS[@]}"; do rm -f "${OUTPUT_DIR:?}/$f"; done
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -120,6 +127,8 @@ composer_quiet() {
 step "[1/5] Extracting '$COMPARE_BRANCH'"
 mkdir "$WORK/compare"
 git -C "$PROJECT_DIR" archive "$COMPARE_BRANCH" | tar -x -C "$WORK/compare"
+# A committed vendor symlink would redirect the install outside the work directory
+rm -rf "$WORK/compare/vendor"
 [[ -f "$WORK/compare/composer.lock" ]] \
   || echo "Warning: '$COMPARE_BRANCH' has no composer.lock, its vendor/ will be resolved fresh and may not match what was deployed" >&2
 
@@ -129,7 +138,9 @@ php -r 'exit(empty(json_decode(file_get_contents($argv[1]), true)["dev"]) ? 1 : 
   "$PROJECT_DIR/vendor/composer/installed.json" 2>/dev/null && dev_flag=--dev
 
 step "[2/5] Installing vendor/ for '$COMPARE_BRANCH' ($dev_flag)"
-composer_quiet install -d "$WORK/compare" "$dev_flag" --no-progress --no-scripts --no-plugins \
+# Mirror path repositories: symlinks into packages/ would resolve to the new code once moved
+COMPOSER_VENDOR_DIR=vendor COMPOSER_BIN_DIR=vendor/bin COMPOSER_MIRROR_PATH_REPOS=1 \
+  composer_quiet install -d "$WORK/compare" "$dev_flag" --no-progress --no-scripts --no-plugins \
   --no-autoloader --ignore-platform-reqs \
   || die "composer install failed for '$COMPARE_BRANCH' (private packages need auth.json or COMPOSER_AUTH)"
 
@@ -140,6 +151,8 @@ tar -C "$PROJECT_DIR" -cf - \
   --exclude=./.git --exclude=./app/etc/env.php --exclude=./var --exclude=./generated \
   --exclude=./pub/static --exclude=./pub/media --exclude=node_modules . \
   | tar -xf - -C "$WORK/project"
+# Project files must not stand in for results: a symlink named vendor.patch could point at a secret
+(cd "$WORK/project" && rm -rf vendor_orig tmp.patch "${RESULTS[@]}")
 mv "$WORK/compare/vendor" "$WORK/project/vendor_orig"
 rm -rf "$WORK/compare"
 
@@ -151,7 +164,7 @@ diff -urN vendor_orig/ vendor/ >vendor.patch || rc=$?
 [[ -s vendor.patch ]] || echo "Warning: vendor/ is identical to '$COMPARE_BRANCH', nothing to analyse" >&2
 echo "    vendor.patch: $(grep -c '^diff ' vendor.patch || true) files changed"
 
-php_needs="$(composer check-platform-reqs --lock --no-dev --format=json 2>/dev/null | php -r '
+php_needs="$(composer check-platform-reqs --no-plugins --no-scripts --lock --no-dev --format=json 2>/dev/null | php -r '
   foreach (json_decode(stream_get_contents(STDIN), true) ?: [] as $r) {
     if ($r["name"] === "php" && $r["status"] === "failed") {
       echo $r["failed_requirement"]["constraint"], " (", $r["failed_requirement"]["source"], ")";
@@ -161,13 +174,15 @@ php_needs="$(composer check-platform-reqs --lock --no-dev --format=json 2>/dev/n
   || echo "Warning: this image runs PHP $(php -r 'echo PHP_VERSION;'), the project needs php $php_needs. Use the matching image tag." >&2
 
 step "[5/5] Running patch-helper"
+# Credentials are only needed for the install, and the analysis boots the project's own code
+unset COMPOSER_AUTH
 rc=0
 php -d memory_limit="$MEMORY_LIMIT" /patch-helper/bin/patch-helper.php analyse "${PH_ARGS[@]}" . \
   2>&1 | tee patch-helper-output.txt || rc=$?
 
 if [[ "$GUI_MODE" == true && $rc == 0 ]]; then
   step "Writing GUI files"
-  composer_quiet dump-autoload --classmap-authoritative
+  composer_quiet dump-autoload --no-plugins --no-scripts --classmap-authoritative
   # The GUI joins these paths onto the directory it opens, so make them relative to the project root
   # shellcheck disable=SC2016
   php -r '
@@ -180,15 +195,15 @@ if [[ "$GUI_MODE" == true && $rc == 0 ]]; then
   tar -czf vendor_orig.tar.gz vendor_orig/
 fi
 
-for f in vendor.patch vendor_files_to_check.patch patch-helper-output.txt classmap.json vendor_orig.tar.gz; do
-  [[ -f "$f" ]] && cp "$f" "$OUTPUT_DIR/"
+for f in "${RESULTS[@]}"; do
+  [[ -f "$f" && ! -L "$f" ]] && cp "$f" "$OUTPUT_DIR/"
 done
-echo "Results written to $OUTPUT_DIR"
 
 if (( rc != 0 )); then
-  echo "Error: patch-helper failed (exit $rc), see patch-helper-output.txt" >&2
+  echo "Error: patch-helper failed (exit $rc), see $OUTPUT_DIR/patch-helper-output.txt" >&2
   exit 1
 fi
+echo "Results written to $OUTPUT_DIR"
 
 if [[ "$GUI_MODE" == true ]]; then
   cat <<EOF

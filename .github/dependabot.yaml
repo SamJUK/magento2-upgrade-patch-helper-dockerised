@@ -14,6 +14,20 @@ updates:
           - "*"
     assignees:
       - "SamJUK"
+  - package-ecosystem: "docker"
+    directory: "/src"
+    schedule:
+      interval: "weekly"
+      time: "06:00"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    groups:
+      composer-image:
+        patterns:
+          - "*"
+    assignees:
+      - "SamJUK"
   # PHP patch releases for the pinned base images, one directory per PHP minor
   - package-ecosystem: "docker"
     directories:

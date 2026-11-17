@@ -37,6 +37,9 @@ jobs:
         env:
           PHP_VERSION: ${{ matrix.php_version }}
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
@@ -69,6 +72,7 @@ jobs:
         with:
           context: src
           push: true
+          platforms: linux/amd64,linux/arm64
           build-args: |
             PHP_VERSION=${{ matrix.php_version }}
             PHP_IMAGE=${{ steps.pin.outputs.image }}

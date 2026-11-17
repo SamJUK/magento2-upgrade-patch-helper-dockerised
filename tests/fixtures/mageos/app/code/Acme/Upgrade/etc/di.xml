@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Magento\Customer\Model\ForgotPasswordToken\GetCustomerByToken" type="Acme\Upgrade\Model\GetCustomerByToken"/>
+    <type name="Magento\Email\Model\Template\Filter">
+        <plugin name="acme_upgrade_filter" type="Acme\Upgrade\Plugin\FilterPlugin"/>
+    </type>
+</config>

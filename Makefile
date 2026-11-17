@@ -4,12 +4,12 @@ IMAGE_TAG   := $(IMAGE_NAME):$(PHP_VERSION)
 .PHONY: build build-all test test-smoke test-e2e push push-all clean help
 
 build: ## Build the test image for PHP_VERSION (default: 8.2)
-	docker build --build-arg PHP_VERSION=$(PHP_VERSION) -t $(IMAGE_TAG) src/
+	docker build --build-arg PHP_VERSION=$(PHP_VERSION) --build-arg PHP_IMAGE=$$(sed -n 's/^FROM //p' src/php/$(PHP_VERSION)/Dockerfile) -t $(IMAGE_TAG) src/
 
 build-all: ## Build images for PHP 8.1–8.5
 	@for v in 8.1 8.2 8.3 8.4 8.5; do \
 	  echo "==> Building PHP $$v"; \
-	  docker build --build-arg PHP_VERSION=$$v -t $(IMAGE_NAME):$$v src/; \
+	  docker build --build-arg PHP_VERSION=$$v --build-arg PHP_IMAGE=$$(sed -n 's/^FROM //p' src/php/$$v/Dockerfile) -t $(IMAGE_NAME):$$v src/; \
 	done
 
 test: test-smoke test-e2e ## Run smoke + E2E tests

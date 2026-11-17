@@ -14,14 +14,18 @@ updates:
           - "*"
     assignees:
       - "SamJUK"
+  # PHP patch releases for the pinned base images, one directory per PHP minor
   - package-ecosystem: "docker"
-    directory: "/src"
+    directories:
+      - "/src/php/*"
     schedule:
-      interval: "weekly"
+      interval: "daily"
       time: "06:00"
-      day: "monday"
-    cooldown:
-      default-days: 7
+    ignore:
+      - dependency-name: "php"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     groups:
       all-docker:
         patterns:

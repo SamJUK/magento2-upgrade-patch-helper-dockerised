@@ -1,5 +1,7 @@
 ARG PHP_VERSION=8.2
-FROM php:${PHP_VERSION}-cli-alpine
+# Builds pass the pinned image from php/<minor>/Dockerfile, which Dependabot bumps
+ARG PHP_IMAGE=php:${PHP_VERSION}-cli-alpine
+FROM ${PHP_IMAGE}
 
 RUN apk add --no-cache \
         bash \

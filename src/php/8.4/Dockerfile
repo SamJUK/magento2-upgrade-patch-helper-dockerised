@@ -1,1 +1,1 @@
-FROM php:8.4.27-cli-alpine@sha256:b9014f1cc1983827459faed83b315a40ead9860bdadefc042b31f1540ef8c746
+FROM php:8.4.28RC1-cli-alpine@sha256:ac2ff9c5a33cc1554fce0c138e7e9cc3ca6f71d01dc306696562eb2f7f7d6b71
